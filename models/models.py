@@ -14,7 +14,7 @@ class Lead(models.Model):
             if rec.quotation_count:
                 domain = [('opportunity_id','=',rec.id)]
                 orders = self.env['sale.order'].search(domain)
-                for order in orders:
+                for order in orders.filtered(lambda o: o.state != 'cancel'):
                     res = res + order.amount_total
             rec.expected_revenue = res
 
@@ -28,8 +28,13 @@ class Lead(models.Model):
         for lead, values in zip(leads, vals_list):
             if any(field in ['active', 'stage_id'] for field in values):
                 lead._handle_won_lost(values)
-            if lead.phone:
-                domain = ['|',('phone','=',lead.phone),('mobile','=',lead.phone)]
+            if lead.phone or lead.mobile:
+                if vals.get('phone') and vals.get('mobile'):
+                    domain = [('phone','=',vals.get('phone')),('mobile','=',vals.get('mobile'))]
+                elif vals.get('phone'):
+                    domain = [('phone','=',vals.get('phone'))]
+                elif vals.get('mobile'):
+                    domain = [('mobile','=',vals.get('mobile'))]
                 partner_id = self.env['res.partner'].search(domain,limit=1)
                 if partner_id:
                     lead.partner_id = partner_id.id
@@ -57,8 +62,13 @@ class Lead(models.Model):
         if any(field in ['active', 'stage_id'] for field in vals):
             self._handle_won_lost(vals)
 
-        if vals.get('phone'):
-            domain = ['|',('phone','=',vals.get('phone')),('mobile','=',vals.get('phone'))]
+        if vals.get('phone') or vals.get('mobile'):
+            if vals.get('phone') and vals.get('mobile'):
+                domain = [('phone','=',vals.get('phone')),('mobile','=',vals.get('mobile'))]
+            elif vals.get('phone'):
+                domain = [('phone','=',vals.get('phone'))]
+            elif vals.get('mobile'):
+                domain = [('mobile','=',vals.get('mobile'))]
             partner_id = self.env['res.partner'].search(domain,limit=1)
             if partner_id:
                 vals['partner_id'] = partner_id.id
