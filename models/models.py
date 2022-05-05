@@ -2,21 +2,38 @@
 
 from odoo import api, fields, models
 
+class SaleOrder(models.Model):
+    _inherit = 'sale.order'
+
+    @api.model
+    def create(self, vals):
+        res = super(SaleOrder, self).create(vals)
+        if res.opportunity_id:
+            opportunity_id = res.opportunity_id
+            opportunity_id._compute_expected_revenue()
+        return res
+
+
+
+    def write(self, vals):
+        res = super(SaleOrder, self).write(vals)
+        for rec in self:
+            if rec.opportunity_id:
+                opportunity_id = rec.opportunity_id
+                opportunity_id._compute_expected_revenue()
+        return res
 
 class Lead(models.Model):
     _inherit = "crm.lead"
 
-    expected_revenue = fields.Float('Expected revenue',compute="_compute_expected_revenue")
-
     def _compute_expected_revenue(self):
         for rec in self:
             res = 0
-            if rec.quotation_count:
-                domain = [('opportunity_id','=',rec.id)]
-                orders = self.env['sale.order'].search(domain)
-                for order in orders.filtered(lambda o: o.state != 'cancel'):
-                    res = res + order.amount_total
-            rec.expected_revenue = res
+            domain = [('opportunity_id','=',rec.id)]
+            orders = self.env['sale.order'].sudo().search(domain)
+            for order in orders.filtered(lambda o: o.state != 'cancel'):
+                res = res + order.amount_total
+            rec.write({'expected_revenue': res})
 
     @api.model_create_multi
     def create(self, vals_list):
